@@ -1,9 +1,13 @@
 # Percussion - Musical Touch Interface
 
-A responsive web-based musical instrument that transforms your screen into a playable grid of Percussion. Each square plays an instrument from the percussion box, creating an intuitive and accessible way to make music through touch, mouse, or keyboard.
+A responsive web-based percussion instrument that transforms your screen into a playable grid of 8 percussion sounds. Each square triggers a different percussion instrument, creating an intuitive and accessible way to make music through touch, mouse, or keyboard.
 
 ## Features
 
+- **8 Percussion Instruments**: Cymbals, cymbal roll, snare hit, snare roll, gong, woodblock, triangle, and tom
+- **Configurable Playback Modes**: 
+  - Touch mode: Sound stops when you release
+  - One-shot mode: Sound plays to completion
 - **Responsive Design**: Adapts seamlessly to portrait and landscape orientations
 - **Multiple Input Methods**:
   - Touch/tap on mobile devices
@@ -11,26 +15,44 @@ A responsive web-based musical instrument that transforms your screen into a pla
   - Keyboard controls (Z, X, C, V, B, N, M, ,)
 - **iOS 9+ Compatible**: Extensively tested and optimized for older iOS devices
 
+## Percussion Sounds
+
+1. **Cymbals** (Pad 1) - Pair of cymbals crash
+2. **Cymbal Roll** (Pad 2) - Sustained cymbal roll
+3. **Snare Hit** (Pad 3) - Sharp snare drum hit
+4. **Snare Roll** (Pad 4) - Snare drum roll
+5. **Gong** (Pad 5) - Deep gong strike
+6. **Woodblock** (Pad 6) - Bright woodblock tap
+7. **Triangle** (Pad 7) - Clear triangle ring
+8. **Tom** (Pad 8) - Tom drum hit
+
 ## Usage
 
-### 1. **Launch**: Click/tap anywhere on the splash screen to begin or press any key on the keyboard. 
+### 1. **Launch**: Click/tap anywhere on the splash screen to begin or press any key on the keyboard.
 
 ![Splash Screen](docs/images/splash-screen.png)
 
 ### 2. **Play**: 
-   - Touch or click the Percussion to play notes
-   - Use keyboard keys (Z-X-C-V-B-N-M-,- .) for the 9 Percussion
+   - Touch or click the percussion pads to play sounds
+   - Use keyboard keys (Z-X-C-V-B-N-M-,) for the 8 percussion instruments
    - Press 'P' key for panic stop (stops all notes)
 
 ![App Screenshot](docs/images/app-screenshot.png)
 
 ![Keyboard Layout](docs/images/keyboard-layout.png)
-*Keyboard mapping for the 9 Percussion*
+*Keyboard mapping for the 8 percussion pads*
 
+### 3. **Configure**: Click the settings icon to customize playback modes
+   - **Touch Mode**: Sound stops when you release the pad (default for pads 1, 2, 4, 5)
+   - **One-Shot Mode**: Sound plays to completion regardless of release (default for pads 3, 6, 7, 8)
+
+![Options Screent](docs/images/options-screen.png)
 
 ## How It Works
 
-The app uses the Web Audio API to play recorded sounds in real-time. Each square in the grid corresponds to a piece of percussion.
+The app uses the Web Audio API to play pre-recorded percussion samples in real-time. Each square in the grid corresponds to a different percussion instrument, with configurable playback behavior to suit different playing styles.
+
+## Development
 
 ### Prerequisites
 
@@ -38,11 +60,10 @@ The app uses the Web Audio API to play recorded sounds in real-time. Each square
 - npm or pnpm
 
 ### Installation
-
 ```bash
 # Clone the repository
-git clone https://github.com/gawainhewitt/soundmakers_Percussion.git
-cd Percussion
+git clone https://github.com/gawainhewitt/soundmakers_percussion.git
+cd soundmakers_percussion
 
 # Install dependencies
 npm install
@@ -54,7 +75,6 @@ npm run dev
 Visit `http://localhost:5173` in your browser.
 
 ### Building for Production
-
 ```bash
 # Build the app
 npm run build
@@ -68,7 +88,6 @@ The built files will be in the `dist/` directory, ready for deployment.
 ### Testing on Mobile Devices
 
 To test the production build on physical mobile devices (especially useful for iOS testing):
-
 ```bash
 # Build the app first
 npm run build
@@ -92,42 +111,38 @@ This app has been carefully optimized for iOS 9+ devices:
 - **Zoom Prevention**: Disables pinch-zoom and double-tap-zoom for a native app feel
 
 ## Project Structure
-
 ```
 ├── src/
 │   ├── App.svelte              # Main app component & screen routing
 │   ├── main.js                 # Entry point with iOS fixes
 │   ├── app.css                 # Global styles
 │   └── lib/
-│       ├── AudioEngine.js      # Web Audio API sound generation
-│       ├── Square.svelte       # Individual playable square
-│       ├── GridContainer.svelte # 3x3 grid layout & event handling
-│       ├── OptionsScreen.svelte # Settings interface
-│       ├── ScaleGenerator.js   # Musical scale generation logic
+│       ├── AudioEngine.js      # Web Audio API sample playback
+│       ├── Square.svelte       # Individual playable percussion pad
+│       ├── GridContainer.svelte # 2x4 grid layout & event handling
+│       ├── OptionsScreen.svelte # Playback mode configuration
 │       ├── SplashScreen.svelte # Welcome/instructions screen
 │       ├── IconButton.svelte   # Reusable icon button component
 │       └── ResponsiveContainer.svelte # Orientation handling
 ├── public/
-│   ├── images/                 # Logos and icons
+│   ├── sounds/                 # 8 percussion sound samples (MP3)
+│   ├── images/                 # Logos, icons, and pad graphics
 │   └── polyfills/              # iOS 9+ compatibility scripts
 └── index.html                  # Entry HTML with polyfill loading
 ```
 
 ## Architecture
-
 ```mermaid
 graph TD
     A[App.svelte<br/>Screen Router & State Manager] --> B[SplashScreen.svelte<br/>Welcome & Audio Init]
-    A --> C[OptionsScreen.svelte<br/>Settings Interface]
-    A --> D[GridContainer.svelte<br/>3x3 Grid & Event Handler]
+    A --> C[OptionsScreen.svelte<br/>Playback Mode Settings]
+    A --> D[GridContainer.svelte<br/>2x4 Grid & Event Handler]
     A --> E[IconButton.svelte<br/>Info & Settings Buttons]
     
-    D --> G[AudioEngine.js<br/>Web Audio Synthesis]
-    D --> H[ScaleGenerator.js<br/>Musical Scale Logic]
-    D --> F[Square.svelte ×9<br/>Interactive Note Buttons]
-
+    D --> G[AudioEngine.js<br/>Sample Playback Engine]
+    D --> F[Square.svelte ×8<br/>Interactive Percussion Pads]
     
-    C --> H
+    C --> G
     
     F --> G
     
@@ -136,7 +151,6 @@ graph TD
     style A fill:#06C0F0,stroke:#333,stroke-width:3px,color:#fff
     style D fill:#FBAC2E,stroke:#333,stroke-width:2px,color:#000
     style G fill:#AD71DD,stroke:#333,stroke-width:2px,color:#fff
-    style H fill:#AD71DD,stroke:#333,stroke-width:2px,color:#fff
     style F fill:#90EE90,stroke:#333,stroke-width:2px,color:#000
 ```
 
@@ -146,7 +160,7 @@ graph TD
 
 - **Svelte 5**: Modern, reactive UI framework
 - **Vite**: Fast build tool and dev server
-- **Web Audio API**: Real-time audio synthesis
+- **Web Audio API**: Real-time audio sample playback
 - **Vite Legacy Plugin**: Automatic transpilation and polyfills for older browsers
 
 ### Design Decisions
