@@ -11,63 +11,74 @@
   let audioEngine = null;
   let audioInitialized = false;
   
-  // Scale configuration (defaults)
-  let scaleConfig = {
-    key: 'C',
-    scale: 'major',
-    octave: 4
+  // Pad mode configuration (true = one-shot, false = touch)
+  let padModes = {
+    0: false, // pad 1 - touch mode
+    1: false, // pad 2 - touch mode
+    2: true,  // pad 3 - one-shot mode
+    3: false, // pad 4 - touch mode
+    4: false, // pad 5 - touch mode
+    5: true,  // pad 6 - one-shot mode
+    6: true,  // pad 7 - one-shot mode
+    7: true   // pad 8 - one-shot mode
   };
 
   onMount(() => {
     // Create audio engine immediately (but don't initialize yet)
     audioEngine = new AudioEngine();
     
-    // Load saved scale preferences
-    loadScalePreferences();
+    // Load saved pad mode preferences
+    loadPadModes();
   });
   
-  function loadScalePreferences() {
-    var savedKey = localStorage.getItem('soundmakers-key');
-    var savedScale = localStorage.getItem('soundmakers-scale');
-    var savedOctave = localStorage.getItem('soundmakers-octave');
+ function loadPadModes() {
+    var savedModes = localStorage.getItem('soundmakers-pad-modes');
     
-    if (savedKey) scaleConfig.key = savedKey;
-    if (savedScale) scaleConfig.scale = savedScale;
-    if (savedOctave) scaleConfig.octave = parseInt(savedOctave);
-    
-    console.log('Loaded scale preferences:', scaleConfig);
+    if (savedModes) {
+      try {
+        padModes = JSON.parse(savedModes);
+        console.log('Loaded pad modes:', padModes);
+      } catch (e) {
+        console.error('Failed to parse saved pad modes:', e);
+      }
+    } else {
+      console.log('Using default pad modes:', padModes);
+    }
   }
 
   async function handleSplashClick() {
-  document.body.style.setProperty('background-color', 'rgb(170, 174, 182)', 'important');
-  
-  // Initialize audio context on user interaction (required for iOS)
-  if (audioEngine && !audioInitialized) {
-    await audioEngine.init();
-    audioInitialized = true;
-    console.log('Audio initialized from splash screen');
+    document.body.style.setProperty('background-color', 'rgb(170, 174, 182)', 'important');
+    
+    // Initialize audio context on user interaction (required for iOS)
+    if (audioEngine && !audioInitialized) {
+      await audioEngine.init();
+      
+      // Apply pad modes to audio engine
+      Object.keys(padModes).forEach(function(index) {
+        audioEngine.setPadMode(parseInt(index), padModes[index]);
+      });
+      
+      audioInitialized = true;
+      console.log('Audio initialized from splash screen');
+    }
+    
+    // Show play screen
+    currentScreen = 'play';
+    
+    // CHROME iOS FIX: Wait for layout to settle after transition
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+      window.dispatchEvent(new Event('resize'));
+    }, 100);
   }
-  
-  // Show play screen
-  currentScreen = 'play';
-  
-  // CHROME iOS FIX: Wait for layout to settle after transition
-  setTimeout(() => {
-    window.scrollTo(0, 0);
-    const vh = window.innerHeight * 0.01;
-    document.documentElement.style.setProperty('--vh', `${vh}px`);
-    window.dispatchEvent(new Event('resize'));
-  }, 100);
-}
 
   function gracefullyStopAllNotes() {
-    // Get all active notes and stop them gracefully (with release envelope)
-    if (audioEngine && audioEngine.activeOscillators) {
-      var activeNotes = Array.from(audioEngine.activeOscillators.keys());
-      activeNotes.forEach(function(note) {
-        audioEngine.stopNote(note);
-      });
-      console.log('Gracefully stopped all notes');
+    // Stop all currently playing sounds
+    if (audioEngine) {
+      audioEngine.panic();
+      console.log('Gracefully stopped all sounds');
     }
   }
 
@@ -97,18 +108,24 @@
   }
 
   function handleOptionsSave(event) {
-  // Update scale configuration with new selections
+    // Update pad modes with new selections
     if (event.detail) {
-      scaleConfig = {
-        key: event.detail.key,
-        scale: event.detail.scale,
-        octave: event.detail.octave
-      };
-      console.log('Scale config updated:', scaleConfig);
+      padModes = event.detail.padModes;
+      
+      // Save to localStorage
+      localStorage.setItem('soundmakers-pad-modes', JSON.stringify(padModes));
+      
+      // Apply to audio engine
+      Object.keys(padModes).forEach(function(index) {
+        audioEngine.setPadMode(parseInt(index), padModes[index]);
+      });
+      
+      console.log('Pad modes updated:', padModes);
     }
     
     document.body.style.setProperty('background-color', 'rgb(170, 174, 182)', 'important');
     currentScreen = 'play';
+    
     // CHROME iOS FIX: Wait for layout to settle after transition
     setTimeout(() => {
       window.scrollTo(0, 0);
@@ -155,7 +172,7 @@
 
   <main>
     <ResponsiveContainer>
-      <GridContainer {audioEngine} {scaleConfig} />
+      <GridContainer {audioEngine} />
     </ResponsiveContainer>
   </main>
 {/if}

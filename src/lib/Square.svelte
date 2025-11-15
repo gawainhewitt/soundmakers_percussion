@@ -7,7 +7,6 @@
   export let activeColor = '#06C0F0';
   export let index = 0;
   export let orientation = 'portrait';
-  export let note = 'C4';
   export let audioEngine = null;
   
   export let isPressed = false;
@@ -18,22 +17,25 @@
   // Combine external and local pressed states
   $: effectivePressed = isPressed || localPressed;
   
+  // Calculate which image to show (1-8 for display, but index is 0-7)
+  $: imageNumber = index + 1;
+  $: imageName = effectivePressed ? `${getImageName(imageNumber)}_2.png` : `${getImageName(imageNumber)}.png`;
+  
+  function getImageName(num) {
+    const names = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+    return names[num - 1];
+  }
+  
   function handlePress() {
     localPressed = true;
-    if (audioEngine) {
-      audioEngine.playNote(note);
-    }
-    dispatch('press', { index, note });
+    dispatch('press', { index });
   }
   
   function handleRelease() {
     if (!localPressed) return; // Already released
     localPressed = false;
     activeTouchId = null; // Clear active touch
-    if (audioEngine) {
-      audioEngine.stopNote(note);
-    }
-    dispatch('release', { index, note });
+    dispatch('release', { index });
   }
   
   function handleTouchStart(e) {
@@ -136,7 +138,7 @@
   role="button"
   tabindex="0"
 >
-  <span class="note-label">{note.slice(0, -1)}</span>
+  <img src="/images/{imageName}" alt="Square {imageNumber}" class="square-image" />
 </div>
 
 <style>
@@ -153,31 +155,25 @@
   }
   
   .square.portrait {
-    width: 18vh;
-    height: 18vh;
-  } 
-
-  @media (max-width: 480px) {
-    .square.portrait {
-    width: 16vh;
-    height: 16vh;
-    } 
+    width: 25vw;
+    height: 25vw;
   }
-    
+  
   .square.landscape {
-    width: 24vh;
-    height: 24vh;
+    width: 20vh;
+    height: 20vh;
   }
   
   .square:active {
     transform: scale(0.95);
   }
   
-  .note-label {
-    font-size: 4vmin;
-    font-weight: bold;
-    color: black;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  .square-image {
+    width: 80% !important;
+    height: 80% !important;
+    max-width: 80% !important;
+    max-height: 80% !important;
+    object-fit: contain;
     pointer-events: none;
   }
 </style>

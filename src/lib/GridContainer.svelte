@@ -1,31 +1,14 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import Square from './Square.svelte';
-  import { ScaleGenerator } from './ScaleGenerator.js';
   
   export let audioEngine;
-  export let scaleConfig = { key: 'C', scale: 'major', octave: 4 };
   
   let squares = Array.from({ length: 8 }, function(_, i) { return i; });
   let orientation = 'portrait';
   let cleanupInterval;
-  let scaleGenerator = new ScaleGenerator();
   
-  // Generate scale based on configuration
-  let scale = [];
-  $: {
-    scale = scaleGenerator.generateScale(
-      scaleConfig.key,
-      scaleConfig.scale,
-      scaleConfig.octave
-    );
-    console.log('Generated scale:', scale);
-    
-    // Reset square states when scale changes
-    resetSquareStates();
-  }
-  
-  // Map keyboard keys to square indices
+  // Map keyboard keys to square indices (0-7)
   var keyMap = {
     'z': 0,
     'x': 1,
@@ -34,43 +17,33 @@
     'b': 4,
     'n': 5,
     'm': 6,
-    ',': 7,
+    ',': 7
   };
   
-  // Track which squares are pressed
+  // Track which squares are currently pressed
   let squareStates = {};
   
-  function resetSquareStates() {
-    squareStates = {};
-    squares.forEach(function(_, i) {
-      if (scale[i]) {
-        squareStates[scale[i]] = false;
-      }
-    });
-  }
+  // Initialize square states (all false)
+  squares.forEach(function(index) {
+    squareStates[index] = false;
+  });
   
   // Track which keys are currently held down (prevent key repeat)
   let heldKeys = new Set();
   
   onMount(() => {
-    // Initialize square states
-    resetSquareStates();
-    
-    // Periodic cleanup - check for orphaned oscillators
+    // Periodic cleanup - check for orphaned sounds
     cleanupInterval = setInterval(function() {
       if (audioEngine) {
-        // First do smart cleanup based on square states
         smartCleanup();
-        // Then do nuclear cleanup of any orphaned oscillators (passing square states)
-        audioEngine.cleanupOrphanedOscillators(squareStates);
       }
     }, 1000); // Check every 1 second
     
-    // Add global panic button and keyboard handlers
+    // Add keyboard handlers
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('keyup', handleKeyup);
     
-    // Stop all notes when page loses focus or visibility
+    // Stop all sounds when page loses focus or visibility
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
   });
@@ -92,11 +65,11 @@
   
   function handleVisibilityChange() {
     if (document.hidden && audioEngine) {
-      console.log('Page hidden - stopping all notes');
+      console.log('Page hidden - stopping all sounds');
       audioEngine.panic();
       // Reset all square states
-      Object.keys(squareStates).forEach(function(note) {
-        squareStates[note] = false;
+      Object.keys(squareStates).forEach(function(index) {
+        squareStates[index] = false;
       });
       heldKeys.clear();
     }
@@ -104,44 +77,41 @@
   
   function handleWindowBlur() {
     if (audioEngine) {
-      console.log('Window blur - stopping all notes');
+      console.log('Window blur - stopping all sounds');
       audioEngine.panic();
       // Reset all square states
-      Object.keys(squareStates).forEach(function(note) {
-        squareStates[note] = false;
+      Object.keys(squareStates).forEach(function(index) {
+        squareStates[index] = false;
       });
       heldKeys.clear();
     }
   }
   
   function smartCleanup() {
-    // Get all currently playing notes
-    var playingNotes = Array.from(audioEngine.activeOscillators.keys());
-    
-    // Stop any notes that are playing but their square is not pressed
-    playingNotes.forEach(function(note) {
-      if (!squareStates[note]) {
-        console.warn('Cleaning up stuck note:', note);
-        audioEngine.stopNote(note);
+    // Check if any sounds are playing but their square is not pressed
+    squares.forEach(function(index) {
+      if (audioEngine.isPlaying(index) && !squareStates[index]) {
+        console.warn('Cleaning up stuck sound for square:', index + 1);
+        audioEngine.stopSound(index);
       }
     });
   }
   
   function handleKeydown(e) {
-    // Press 'P' key to panic (stop all notes)
+    // Press 'P' key to panic (stop all sounds)
     if (e.key === 'p' || e.key === 'P') {
       if (audioEngine) {
         audioEngine.panic();
         // Reset all square states
-        Object.keys(squareStates).forEach(function(note) {
-          squareStates[note] = false;
+        Object.keys(squareStates).forEach(function(index) {
+          squareStates[index] = false;
         });
         heldKeys.clear();
       }
       return;
     }
     
-    // Handle instrument keys (zxcvbnm,.)
+    // Handle instrument keys (zxcvbnm,)
     var key = e.key.toLowerCase();
     if (keyMap.hasOwnProperty(key)) {
       // Prevent key repeat - only trigger on first press
@@ -149,14 +119,13 @@
       heldKeys.add(key);
       
       var squareIndex = keyMap[key];
-      var note = scale[squareIndex];
       
       // Trigger press
-      squareStates[note] = true;
+      squareStates[squareIndex] = true;
       if (audioEngine) {
-        audioEngine.playNote(note);
+        audioEngine.playSound(squareIndex);
       }
-      console.log('Key pressed:', key, '→', note);
+      console.log('Key pressed:', key, '→ square', squareIndex + 1);
     }
   }
   
@@ -166,14 +135,13 @@
       heldKeys.delete(key);
       
       var squareIndex = keyMap[key];
-      var note = scale[squareIndex];
       
       // Trigger release
-      squareStates[note] = false;
+      squareStates[squareIndex] = false;
       if (audioEngine) {
-        audioEngine.stopNote(note);
+        audioEngine.stopSound(squareIndex);
       }
-      console.log('Key released:', key, '→', note);
+      console.log('Key released:', key, '→ square', squareIndex + 1);
     }
   }
   
@@ -198,13 +166,19 @@
   
   async function handlePress(event) {
     await initAudio();
-    squareStates[event.detail.note] = true;
-    console.log('Square pressed:', event.detail.note);
+    squareStates[event.detail.index] = true;
+    if (audioEngine) {
+      audioEngine.playSound(event.detail.index);
+    }
+    console.log('Square pressed:', event.detail.index + 1);
   }
   
   function handleRelease(event) {
-    squareStates[event.detail.note] = false;
-    console.log('Square released:', event.detail.note);
+    squareStates[event.detail.index] = false;
+    if (audioEngine) {
+      audioEngine.stopSound(event.detail.index);
+    }
+    console.log('Square released:', event.detail.index + 1);
   }
 </script>
 
@@ -212,14 +186,13 @@
 
 <div class="container {orientation}">
   {#each squares as index}
-  <Square 
+    <Square 
       {index}
       {orientation}
       {audioEngine}
-      note={scale[index]}
-      color={index % 2 === 0 ? 'rgb(255, 255, 0)' : 'rgb(0, 0, 255)'}
+      color="#AD71DD"
       activeColor="rgb(255, 0, 255)"
-      isPressed={squareStates[scale[index]]}
+      isPressed={squareStates[index]}
       on:press={handlePress}
       on:release={handleRelease}
     />
@@ -245,7 +218,7 @@
 
   @media (orientation: landscape) {
     .container {
-      max-width: 100vh; /* or whatever value works */
+      max-width: 100vh;
       margin: 0 auto;
     }
   }

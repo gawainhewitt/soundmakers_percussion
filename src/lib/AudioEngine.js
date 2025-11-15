@@ -1,11 +1,10 @@
-import * as Tone from 'tone';
-
 export class AudioEngine {
   constructor() {
-    this.sampler = null;
-    this.reverb = null;
+    this.audioContext = null;
     this.initialized = false;
-    this.activeNotes = new Set(); // Track currently playing notes
+    this.buffers = {}; // Store loaded audio buffers
+    this.activeSources = {}; // Track currently playing sources by square index
+    this.padModes = {}; // Track mode for each pad (true = one-shot, false = touch)
   }
 
   // Initialize audio context (must be called after user interaction on iOS)
@@ -13,93 +12,139 @@ export class AudioEngine {
     if (this.initialized) return;
     
     try {
-      // Start Tone.js audio context
-      await Tone.start();
-      console.log('Tone.js started, audio context state:', Tone.context.state);
+      // Create audio context with iOS 12 compatibility
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      this.audioContext = new AudioContext();
       
-      // Create sampler with horn samples
-      this.sampler = new Tone.Sampler({
-        urls: {
-          B2: "horn-tone-b2-optimized.mp3",
-          C3: "horn-tone-c3-optimized.mp3",
-          E3: "horn-tone-e3-optimized.mp3",
-          G3: "horn-tone-g3-optimized.mp3",
-          A3: "horn-tone-a3-optimized.mp3",
-          C4: "horn-tone-c4-optimized.mp3"
-        },
-        baseUrl: "/sounds/",
-        release: 8,
-        onload: () => {
-          console.log('Sampler loaded successfully');
-        }
-      }).toDestination();
+      console.log('Audio context created, state:', this.audioContext.state);
+      
+      // iOS requires resuming the context after user interaction
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+        console.log('Audio context resumed, state:', this.audioContext.state);
+      }
+      
+      // Load all 8 sound files
+      await this.loadSounds();
       
       this.initialized = true;
-      console.log('AudioEngine initialized with Tone.js');
+      console.log('AudioEngine initialized successfully');
       
     } catch (error) {
       console.error('Failed to initialize audio:', error);
     }
   }
 
-  playNote(note) {
-    if (!this.sampler || !this.initialized) {
-      console.warn('Sampler not ready');
+  async loadSounds() {
+    const soundFiles = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+    
+    for (let i = 0; i < soundFiles.length; i++) {
+      const soundName = soundFiles[i];
+      const url = `/sounds/${soundName}.mp3`;
+      
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        
+        // iOS 12 may need the callback version of decodeAudioData
+        const audioBuffer = await new Promise((resolve, reject) => {
+          this.audioContext.decodeAudioData(
+            arrayBuffer,
+            (buffer) => resolve(buffer),
+            (error) => reject(error)
+          );
+        });
+        
+        this.buffers[i] = audioBuffer;
+        console.log(`Loaded sound ${i + 1}: ${soundName}`);
+      } catch (error) {
+        console.error(`Failed to load ${soundName}:`, error);
+      }
+    }
+    
+    console.log('All sounds loaded. Total buffers:', Object.keys(this.buffers).length);
+  }
+
+  playSound(squareIndex) {
+    if (!this.audioContext || !this.initialized) {
+      console.warn('Audio not ready');
+      return;
+    }
+
+    // Stop any existing sound for this square
+    this.stopSound(squareIndex);
+
+    // Get the audio buffer for this square
+    const buffer = this.buffers[squareIndex];
+    if (!buffer) {
+      console.warn('No buffer for square', squareIndex);
+      return;
+    }
+
+    // Create a new source node
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.audioContext.destination);
+    
+    // Track this source
+    this.activeSources[squareIndex] = source;
+    
+    // Remove from active sources when it finishes playing
+    source.onended = () => {
+      if (this.activeSources[squareIndex] === source) {
+        delete this.activeSources[squareIndex];
+        console.log('Sound finished for square', squareIndex + 1);
+      }
+    };
+    
+    // Start playing
+    source.start(0);
+    console.log('Playing sound for square', squareIndex + 1);
+  }
+
+  stopSound(squareIndex) {
+    // Don't stop if this pad is in one-shot mode
+    if (this.padModes[squareIndex]) {
+      console.log('Pad', squareIndex + 1, 'is in one-shot mode, letting sound finish');
       return;
     }
     
-    // Stop existing note first (important for retriggering)
-    this.stopNote(note);
-    
-    // Play the note with Tone.js (duration set to 8 seconds, will be stopped earlier if needed)
-    this.sampler.triggerAttack(note, Tone.now());
-    this.activeNotes.add(note);
-    
-    console.log('Playing note:', note);
-  }
-
-  stopNote(note) {
-    if (!this.sampler || !this.initialized) return;
-    
-    if (this.activeNotes.has(note)) {
-      // Release the note (will respect the 8-second release time)
-      this.sampler.triggerRelease(note, Tone.now());
-      this.activeNotes.delete(note);
-      
-      console.log('Stopping note:', note);
-    }
-  }
-
-  // Emergency stop all notes
-  panic() {
-    console.log('PANIC: Stopping all notes');
-    
-    if (this.sampler && this.initialized) {
-      // Release all currently active notes
-      this.activeNotes.forEach(note => {
-        this.sampler.triggerRelease(note, Tone.now());
-      });
-      
-      // Alternative: force stop everything immediately
-      this.sampler.releaseAll(Tone.now());
-      
-      this.activeNotes.clear();
-    }
-  }
-
-  // Cleanup for orphaned notes (simplified since Tone.js handles this better)
-  cleanupOrphanedOscillators(squareStates = {}) {
-    // Check for notes that are marked as active but shouldn't be
-    this.activeNotes.forEach(note => {
-      if (!squareStates[note]) {
-        console.warn('Cleaning up orphaned note:', note);
-        this.stopNote(note);
+    const source = this.activeSources[squareIndex];
+    if (source) {
+      try {
+        source.stop();
+      } catch (e) {
+        // Already stopped
       }
+      delete this.activeSources[squareIndex];
+      console.log('Stopped sound for square', squareIndex + 1);
+    }
+  }
+
+  // Check if a sound is currently playing
+  isPlaying(squareIndex) {
+    return !!this.activeSources[squareIndex];
+  }
+
+  // Stop all sounds
+  panic() {
+    console.log('PANIC: Stopping all sounds');
+    Object.keys(this.activeSources).forEach(index => {
+      this.stopSound(parseInt(index));
     });
   }
 
-  // Force stop all (for compatibility)
-  forceStopAllOscillators() {
-    this.panic();
+  // Set whether a pad is in one-shot mode
+  setPadMode(squareIndex, isOneShot) {
+    this.padModes[squareIndex] = isOneShot;
+    console.log(`Pad ${squareIndex + 1} mode set to:`, isOneShot ? 'one-shot' : 'touch');
+  }
+
+  // Get pad mode
+  getPadMode(squareIndex) {
+    return this.padModes[squareIndex] || false;
   }
 }

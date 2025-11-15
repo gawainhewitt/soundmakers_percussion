@@ -8,7 +8,7 @@ A responsive web-based musical instrument that transforms your screen into a pla
 - **Multiple Input Methods**:
   - Touch/tap on mobile devices
   - Mouse clicks on desktop
-  - Keyboard controls (Z, X, C, V, B, N, M)
+  - Keyboard controls (Z, X, C, V, B, N, M, ,)
 - **iOS 9+ Compatible**: Extensively tested and optimized for older iOS devices
 
 ## Usage
