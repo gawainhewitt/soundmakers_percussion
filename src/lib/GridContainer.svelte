@@ -189,7 +189,6 @@
     <Square 
       {index}
       {orientation}
-      {audioEngine}
       color="#AD71DD"
       activeColor="rgb(255, 0, 255)"
       isPressed={squareStates[index]}

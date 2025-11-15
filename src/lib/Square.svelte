@@ -7,7 +7,6 @@
   export let activeColor = '#06C0F0';
   export let index = 0;
   export let orientation = 'portrait';
-  export let audioEngine = null;
   
   export let isPressed = false;
   let element;

@@ -1,28 +1,32 @@
 <script>
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
-  import { ScaleGenerator } from './ScaleGenerator.js';
   
   const dispatch = createEventDispatcher();
   
-  // Get available options
-  const availableKeys = ScaleGenerator.getAllKeys();
-  const availableScales = ScaleGenerator.getAllScaleTypes();
-  const availableOctaves = ScaleGenerator.getAllOctaves();
-  
-  // Current selections (load from localStorage or use defaults)
-  let selectedKey = 'C';
-  let selectedScale = 'major';
-  let selectedOctave = 4;
+  // Current pad modes (true = one-shot, false = touch)
+  let padModes = {
+    0: false,
+    1: false,
+    2: true,
+    3: false,
+    4: false,
+    5: true,
+    6: true,
+    7: true
+  };
   
   // Load saved preferences on mount
   onMount(() => {
-    var savedKey = localStorage.getItem('soundmakers-key');
-    var savedScale = localStorage.getItem('soundmakers-scale');
-    var savedOctave = localStorage.getItem('soundmakers-octave');
+    var savedModes = localStorage.getItem('soundmakers-pad-modes');
     
-    if (savedKey) selectedKey = savedKey;
-    if (savedScale) selectedScale = savedScale;
-    if (savedOctave) selectedOctave = parseInt(savedOctave);
+    if (savedModes) {
+      try {
+        padModes = JSON.parse(savedModes);
+        console.log('Loaded pad modes in options:', padModes);
+      } catch (e) {
+        console.error('Failed to parse saved pad modes:', e);
+      }
+    }
     
     window.addEventListener('keydown', handleKeydown);
   });
@@ -32,16 +36,9 @@
   });
   
   function handleSave() {
-    // Save to localStorage
-    localStorage.setItem('soundmakers-key', selectedKey);
-    localStorage.setItem('soundmakers-scale', selectedScale);
-    localStorage.setItem('soundmakers-octave', selectedOctave.toString());
-    
-    // Dispatch save event with the selections
+    // Dispatch save event with the pad modes
     dispatch('save', {
-      key: selectedKey,
-      scale: selectedScale,
-      octave: selectedOctave
+      padModes: padModes
     });
   }
   
@@ -52,74 +49,43 @@
     }
   }
   
-  function selectKey(key) {
-    selectedKey = key;
+  function togglePadMode(padIndex) {
+    padModes[padIndex] = !padModes[padIndex];
+    console.log(`Pad ${padIndex + 1} mode toggled to:`, padModes[padIndex] ? 'one-shot' : 'touch');
   }
   
-  function selectScale(scale) {
-    selectedScale = scale;
-  }
-  
-  function selectOctave(octave) {
-    selectedOctave = octave;
+  function getModeLabel(padIndex) {
+    return padModes[padIndex] ? 'One-Shot' : 'Touch';
   }
 </script>
 
 <div class="options-screen">
   <div class="content">
-  <h1>Options</h1>
-  
-  <div class="options-wrapper">
-    <!-- Key Selection -->
-    <div class="option-section">
-      <h2>Key</h2>
-      <div class="button-grid keys">
-        {#each availableKeys as key}
-          <button 
-            class="option-button {selectedKey === key ? 'selected' : ''}"
-            on:click={() => selectKey(key)}
-          >
-            {key}
-          </button>
-        {/each}
+    <h1>Options</h1>
+    
+    <div class="options-wrapper">
+      <div class="option-section">
+        <h2>Pad Playback Modes</h2>
+        <p class="description">Touch: sound stops when released | One-Shot: sound plays to end</p>
+        
+        <div class="pad-grid">
+          {#each Array(8) as _, i}
+            <button 
+              class="pad-button {padModes[i] ? 'one-shot' : 'touch'}"
+              on:click={() => togglePadMode(i)}
+            >
+              <span class="pad-number">Pad {i + 1}</span>
+              <span class="pad-mode">{getModeLabel(i)}</span>
+            </button>
+          {/each}
+        </div>
       </div>
     </div>
     
-    <!-- Scale Type Selection -->
-    <div class="option-section">
-      <h2>Scale</h2>
-      <div class="button-grid scales">
-        {#each availableScales as scale}
-          <button 
-            class="option-button scale-button {selectedScale === scale ? 'selected' : ''}"
-            on:click={() => selectScale(scale)}
-          >
-            {ScaleGenerator.getScaleDisplayName(scale)}
-          </button>
-        {/each}
-      </div>
-    </div>
-    
-    <!-- Octave Selection -->
-    <div class="option-section">
-      <h2>Octave</h2>
-      <div class="button-grid octaves">
-        {#each availableOctaves as octave}
-          <button 
-            class="option-button {selectedOctave === octave ? 'selected' : ''}"
-            on:click={() => selectOctave(octave)}
-          >
-            {octave}
-          </button>
-        {/each}
-      </div>
-    </div>
+    <button class="save-button" on:click={handleSave}>
+      Save
+    </button>
   </div>
-  
-  <button class="save-button" on:click={handleSave}>
-    Save
-  </button>
-</div>
 </div>
 
 <style>
@@ -147,91 +113,97 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;  /* CHANGE from space-between to flex-start */
+    gap: 1rem;  /* ADD THIS - creates consistent spacing */
   }
   
   h1 {
     font-size: 2.5rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     color: #333;
     flex-shrink: 0;
   }
   
+  .options-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow-y: auto;
+    /* REMOVE: flex: 1; */
+  }
+  
   .option-section {
-    margin-bottom: 2.5rem;
+    margin-bottom: 1rem;
   }
   
   h2 {
     font-size: 1.3rem;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     color: #555;
     font-weight: 600;
   }
   
-  .button-grid {
+  .description {
+    font-size: 0.9rem;
+    color: #777;
+    margin-bottom: 1.5rem;
+    line-height: 1.4;
+  }
+  
+  .pad-grid {
     display: grid;
-    gap: 0.75rem;
-    justify-content: center;
-  }
-  
-  .button-grid.keys {
-    grid-template-columns: repeat(6, 1fr);
-    max-width: 500px;
-    margin: 0 auto;
-  }
-  
-  .button-grid.scales {
     grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
     max-width: 500px;
     margin: 0 auto;
   }
   
-  .button-grid.octaves {
-    grid-template-columns: repeat(5, 1fr);
-    max-width: 400px;
-    margin: 0 auto;
-  }
-  
-  .option-button {
+  .pad-button {
     background-color: #f5f5f5;
     color: #333;
-    border: 2px solid #ddd;
-    padding: 0.9rem 1.2rem;
+    border: 3px solid #ddd;
+    padding: 1.2rem 1rem;
     font-size: 1rem;
     font-weight: 600;
     border-radius: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    min-height: 50px;
     display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
     align-items: center;
     justify-content: center;
   }
   
-  .option-button.scale-button {
-    font-size: 0.95rem;
-  }
-  
-  .option-button:hover {
-    background-color: #e8e8e8;
+  .pad-button:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   }
   
-  .option-button:active {
+  .pad-button:active {
     transform: translateY(0);
   }
   
-  .option-button.selected {
-    background-color: #FBAC2E;
-    color: white;
-    border-color: #FBAC2E;
-    box-shadow: 0 4px 12px rgba(251, 172, 46, 0.4);
+  .pad-button.touch {
+    background-color: #E8F4F8;
+    border-color: #06C0F0;
   }
   
-  .option-button.selected:hover {
-    background-color: #E99A1A;
+  .pad-button.one-shot {
+    background-color: #FFF4E6;
+    border-color: #FBAC2E;
+  }
+  
+  .pad-number {
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+  
+  .pad-mode {
+    font-size: 0.85rem;
+    font-weight: 500;
+    opacity: 0.8;
   }
   
   .save-button {
@@ -263,232 +235,176 @@
   /* Tablet Portrait (iPad) */
   @media (min-width: 481px) and (max-width: 1024px) and (orientation: portrait) {
     .options-screen {
-      padding: 1rem 1.5rem;
-    }
-    
-    .content {
-      gap: 0.5rem;
-      justify-content: flex-start;
+      padding: 1.5rem;
     }
     
     h1 {
-      font-size: 2.5rem;
-      margin-bottom: 0.5rem;
+      font-size: 2.2rem;
+      margin-bottom: 0.8rem;
     }
     
     h2 {
-      font-size: 1.3rem;
-      margin-bottom: 0.5rem;
+      font-size: 1.2rem;
     }
     
-    .option-section {
-      margin-bottom: 0.5rem;
+    .description {
+      font-size: 0.85rem;
+      margin-bottom: 1.2rem;
     }
     
-    .button-grid {
-      gap: 0.75rem;
+    .pad-grid {
+      gap: 0.8rem;
     }
     
     .save-button {
-      margin-top: 2.5rem;
+      margin-top: 0.5rem;  /* ADD/CHANGE THIS - reduce from 1.5rem */
       max-width: 50%;
       align-self: center;
     }
   }
   
-  /* Mobile Portrait - Stack everything, make scales 2-column */
+  /* Mobile Portrait */
   @media (max-width: 480px) {
     .options-screen {
-      padding: 0.5rem 1rem;
-    }
-    
-    .content {
-      justify-content: flex-start;
-      gap: 0.5rem;
+      padding: 1rem;
     }
     
     h1 {
-      font-size: 1.6rem;
+      font-size: 1.8rem;
       margin-bottom: 0.5rem;
     }
     
     h2 {
-      font-size: 0.9rem;
+      font-size: 1rem;
       margin-bottom: 0.4rem;
     }
     
-    .option-section {
-      margin-bottom: 0.5rem;
+    .description {
+      font-size: 0.75rem;
+      margin-bottom: 1rem;
     }
     
-    .button-grid {
-      gap: 0.4rem;
+    .pad-grid {
+      gap: 0.6rem;
     }
     
-    .button-grid.keys {
-      grid-template-columns: repeat(3, 1fr);
+    .pad-button {
+      padding: 1rem 0.8rem;
+      font-size: 0.9rem;
     }
     
-    .button-grid.scales {
-      grid-template-columns: repeat(2, 1fr);
+    .pad-number {
+      font-size: 0.85rem;
     }
     
-    .option-button {
-      padding: 0.55rem 0.4rem;
-      font-size: 0.8rem;
-      min-height: 42px;
-    }
-    
-    .option-button.scale-button {
+    .pad-mode {
       font-size: 0.75rem;
     }
     
     .save-button {
-      padding: 0.7rem 1.8rem;
-      font-size: 0.95rem;
-      margin-top: 0.3rem;
+      padding: 0.8rem 2rem;
+      font-size: 1rem;
+      margin-top: 0.5rem;   
     }
   }
   
- /* Landscape mode - Horizontal rows layout */
+  /* Landscape mode - Horizontal layout */
   @media (orientation: landscape) {
     .options-screen {
-      padding: 0.5rem 2rem;
+      padding: 1rem 2rem;
       justify-content: flex-start;
     }
     
     .content {
       max-width: 100%;
-      display: flex;
-      flex-direction: column;
       justify-content: flex-start;
-      gap: 1.2rem;
+      gap: 0.5rem;
       height: auto;
-      margin-top: 0.5rem;
+      margin-top: 1rem;
     }
     
     h1 {
-      font-size: 2.2rem;
-      margin-bottom: 0.7rem;
-    }
-    
-    .option-section {
-      margin-bottom: 0;
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
     }
     
     h2 {
-      font-size: 1.2rem;
-      margin-bottom: 0.7rem;
-    }
-    
-    .button-grid {
-      gap: 0.7rem;
-      max-width: 85%;
-      margin: 0 auto;
-    }
-    
-    .button-grid.keys {
-      grid-template-columns: repeat(12, 1fr);
-    }
-    
-    .button-grid.scales {
-      grid-template-columns: repeat(5, 1fr);
-    }
-    
-    .button-grid.octaves {
-      grid-template-columns: repeat(5, 1fr);
-    }
-    
-    .option-button {
-      padding: 0.9rem 0.7rem;
       font-size: 1.1rem;
-      min-height: 54px;
-      box-sizing: border-box;
-      width: 100%;
-      min-width: 0;
-    }
-    
-    .option-button.scale-button {
-      font-size: 1.05rem;
-    }
-    
-    .save-button {
-      padding: 1rem 3rem;
-      font-size: 1.3rem;
-      max-width: 320px;
-      align-self: center;
-      margin-top: 1.2rem;
-    }
-  }
-  
-  /* Very short landscape (iPhone landscape) - Two column layout */
-  @media (orientation: landscape) and (max-height: 450px) {
-    .options-screen {
-      padding: 0.5rem 1rem;
-    }
-    
-    .content {
-      gap: 0.5rem;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      grid-template-rows: auto 1fr;
-    }
-    
-    h1 {
-      grid-column: 1 / -1;
-      font-size: 1.4rem;
       margin-bottom: 0.3rem;
     }
     
-    .options-wrapper {
-      grid-column: 1;
-      grid-row: 2;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      overflow: hidden;
-      align-self: start;
+    .description {
+      font-size: 0.8rem;
+      margin-bottom: 1rem;
+    }
+    
+    .pad-grid {
+      grid-template-columns: repeat(4, 1fr);
+      max-width: 90%;
+      gap: 0.8rem;
+    }
+    
+    .pad-button {
+      padding: 1rem 0.5rem;
+      font-size: 0.85rem;
     }
     
     .save-button {
-      grid-column: 2;
-      grid-row: 2;
-      padding: 1.5rem 1rem;
-      font-size: 0.9rem;
-      margin-left: -4rem;
-      max-width: none;
+      padding: 0.9rem 2.5rem;
+      font-size: 1.1rem;
+      max-width: 300px;
       align-self: center;
-      margin-bottom: 2.5rem;
+      margin-top: 1rem;
+    }
+  }
+  
+  /* Very short landscape (iPhone landscape) */
+  @media (orientation: landscape) and (max-height: 450px) {
+    .options-screen {
+      padding: 0.3rem 1rem;  /* CHANGE - reduce from 0.5rem 1rem */
+    }
+    
+    .content {
+      margin-top: 0.3rem;  /* ADD THIS - reduce from 1rem */
+      gap: 0.3rem;  /* ADD THIS - reduce spacing between elements */
+    }
+    
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 0.2rem;  /* CHANGE - reduce from 0.3rem */
     }
     
     h2 {
-      font-size: 13px !important;
-      margin-bottom: 0.3rem !important;
-      line-height: 1 !important;
-      font-weight: 600 !important;
-      height: 16px;
-    }
-
-    .option-section {
-      margin-bottom: 0;
-      flex-shrink: 0;
+      font-size: 0.9rem;
+      margin-bottom: 0.1rem;
     }
     
-    .button-grid {
-      gap: 0.4rem;
+    .description {
+      font-size: 0.65rem;
+      margin-bottom: 0.3rem;  /* CHANGE - reduce from 0.5rem */
     }
     
-    .option-button {
-      padding: 0.5rem 0.3rem;
+    .pad-grid {
+      gap: 0.5rem;
+    }
+    
+    .pad-button {
+      padding: 0.7rem 0.4rem;
+      font-size: 0.75rem;
+    }
+    
+    .pad-number {
       font-size: 0.7rem;
-      min-height: 36px;
     }
     
-    .option-button.scale-button {
+    .pad-mode {
       font-size: 0.65rem;
     }
     
-    
+    .save-button {
+      padding: 0.7rem 2rem;
+      font-size: 0.9rem;
+      margin-top: 0.3rem;  /* CHANGE - reduce from 0.5rem */
+    }
   }
-  
 </style>
